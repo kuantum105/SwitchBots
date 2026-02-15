@@ -229,6 +229,7 @@ def IsEggInTeamSlot(TeamIndex):
     Frame = Bot.GetFrameGrayscale()
     TeamMember = TeamCrop(Frame, TeamIndex)
     Score = Bot.GetMatchScore(TeamMember, EggInTeam)
+    print(Score)
     return Score >= EggInTeamThreshold
 
 

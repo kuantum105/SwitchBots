@@ -114,7 +114,7 @@ def ShowLive(Seconds):
 def GetMatchScore(frame, template):
     res = cv2.matchTemplate(frame, template, eval('cv2.TM_CCOEFF_NORMED'))
     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-    return max_val
+    return max_val, min_loc, max_loc
 
 
 # Email -----------------------------------------------------------------------
