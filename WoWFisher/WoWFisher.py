@@ -363,7 +363,7 @@ def TryLootBoP():
         time.sleep(1)
 
 hookPrompt = cv2.imread(
-    'Resources\\HookScreenshot_ThunderBluff.png', cv2.IMREAD_COLOR)
+    'Resources\\HookScreenshot_Stonetalon.png', cv2.IMREAD_COLOR)
 hookPromptThreshold = 0.08
 hookAlpha = 4
 
