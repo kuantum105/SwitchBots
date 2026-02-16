@@ -19,17 +19,16 @@ import cProfile
 # Shared bot functionality
 dirPath = os.path.dirname(os.path.realpath(__file__))
 sys.path.append("{}\\..".format(dirPath))
-import BotCore as Bot
 from Config import *
 
 
 # globals
 screenshotPath = "{}\\Output\\Screenshot.png".format(dirPath)
-x, y = pyautogui.size()
-x2, y2 = pyautogui.size()
-x2, y2 = int(str(x2)), int(str(y2))
-x3 = x2 // 2
-y3 = y2 // 2
+#x, y = pyautogui.size()
+#x2, y2 = pyautogui.size()
+#x2, y2 = int(str(x2)), int(str(y2))
+x3 = 1280
+y3 = 720
 
 
 programStateIndeterminate = -1
@@ -139,9 +138,9 @@ def GetCharacterTransform():
     frame = GetScreenshotGrayscale()
     coordImage = frame[694: 694 + 26, 1141: 1141 + 139]
     coordText = pytesseract.image_to_string(coordImage)
-    coordText = re.sub('\s+', "", coordText)
+    coordText = re.sub('\\s+', "", coordText)
 
-    search = re.search('([0-9\.]*),([0-9\.]*),([0-9\.]*)', coordText)
+    search = re.search('([0-9\\.]*),([0-9\\.]*),([0-9\\.]*)', coordText)
     if (search):
         xCoord = float(search.group(1))
         yCoord = float(search.group(2))
@@ -272,6 +271,14 @@ def MapCrop(frame):
     return frame[47: 47 + 74, 1152: 1152 + 91]
 
 
+# Returns the match score for the given template in the given frame. Ranges
+# from 0 to 1, which larger numbers indicating a stronger match.
+def GetMatchScore(frame, template):
+    res = cv2.matchTemplate(frame, template, eval('cv2.TM_CCOEFF_NORMED'))
+    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+    return max_val, min_loc, max_loc
+
+
 SchoolNode = cv2.imread('Resources\\SchoolNode.png', cv2.IMREAD_COLOR)
 SchoolScoreThreshold = 0.8
 OriginLocation = (36, 47)
@@ -279,7 +286,7 @@ OriginLocation = (36, 47)
 
 def GetSchoolLocation(data):
     mapFrame = MapCrop(data.frame)
-    score, minLoc, maxLoc = Bot.GetMatchScore(mapFrame, SchoolNode)
+    score, minLoc, maxLoc = GetMatchScore(mapFrame, SchoolNode)
     if (score > SchoolScoreThreshold):
         return np.subtract(maxLoc, OriginLocation)
     else:
@@ -343,7 +350,7 @@ okayPromptThreshold = 0.9
 
 def TryLootBoP():
     frame = GetScreenshotColor()
-    score, minLoc, maxLoc = Bot.GetMatchScore(frame, okayPrompt)
+    score, minLoc, maxLoc = GetMatchScore(frame, okayPrompt)
     if (score > okayPromptThreshold):
         h, w, d = okayPrompt.shape
         matchLocMin = (maxLoc[0], maxLoc[1])
@@ -356,9 +363,9 @@ def TryLootBoP():
         time.sleep(1)
 
 hookPrompt = cv2.imread(
-    'Resources\\HookScreenshot_Stormwind.png', cv2.IMREAD_COLOR)
-hookPromptThreshold = 0.05
-hookAlpha = 3
+    'Resources\\HookScreenshot_ThunderBluff.png', cv2.IMREAD_COLOR)
+hookPromptThreshold = 0.08
+hookAlpha = 4
 
 
 frameMin = x3/4, 0
@@ -367,7 +374,7 @@ frameMax = 3 * x3 / 4, y3/2
 
 def GetHookFrameData():
     frame = GetScreenshotColor((frameMin[0], frameMin[1], frameMax[0], frameMax[1]))
-    score, minLoc, maxLoc = Bot.GetMatchScore(frame, hookPrompt)
+    score, minLoc, maxLoc = GetMatchScore(frame, hookPrompt)
     return frame, score, maxLoc
 
 
