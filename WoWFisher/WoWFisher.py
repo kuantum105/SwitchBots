@@ -274,10 +274,35 @@ def MapCrop(frame):
 # Returns the match score for the given template in the given frame. Ranges
 # from 0 to 1, which larger numbers indicating a stronger match.
 def GetMatchScore(frame, template):
+    res = cv2.matchTemplate(frame, template, eval('cv2.TM_CCOEFF'))
+    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+    return max_val, min_loc, max_loc
+
+
+def GetMatchScoreNormed(frame, template):
     res = cv2.matchTemplate(frame, template, eval('cv2.TM_CCOEFF_NORMED'))
     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
     return max_val, min_loc, max_loc
 
+
+catchDebugCounts = {}
+sessionDebugCounts = {}
+def DisplayDebugOutput(outputName, frame, template, maxLoc, peristForSession):
+    newFrame = frame.copy()
+    h, w, d = template.shape
+    topLeft = int(maxLoc[0]), int(maxLoc[1])
+    bottomRight = (topLeft[0] + w, topLeft[1] + h)
+    cv2.rectangle(newFrame, topLeft, bottomRight, 255, 2)
+
+    debugCounts = sessionDebugCounts if peristForSession else catchDebugCounts
+    debugCounts.setdefault(outputName, 0)
+    screenshotNum = debugCounts.get(outputName)
+    debugCounts[outputName] = screenshotNum + 1
+
+    debugScreenshotPath = "{}\\Output\\Debug\\{}{}.png".format(dirPath, outputName, screenshotNum)
+    cv2.imwrite(debugScreenshotPath, newFrame)
+    # cv2.imshow(windowName, newFrame)
+    # cv2.waitKey(1)
 
 SchoolNode = cv2.imread('Resources\\SchoolNode.png', cv2.IMREAD_COLOR)
 SchoolScoreThreshold = 0.8
@@ -316,8 +341,10 @@ class DynamicFishingData:
     timeOfLastCast = time.time()
     timeOfLastHookAction = time.time()
     calibrationScores = []
+    calibrationLocations = []
     scoreAverage = 0
     scoreStdDev = 0
+    averageLocation = None
 
 
 FishingData = None
@@ -350,7 +377,7 @@ okayPromptThreshold = 0.9
 
 def TryLootBoP():
     frame = GetScreenshotColor()
-    score, minLoc, maxLoc = GetMatchScore(frame, okayPrompt)
+    score, minLoc, maxLoc = GetMatchScoreNormed(frame, okayPrompt)
     if (score > okayPromptThreshold):
         h, w, d = okayPrompt.shape
         matchLocMin = (maxLoc[0], maxLoc[1])
@@ -361,37 +388,43 @@ def TryLootBoP():
         time.sleep(1)
         pyautogui.leftClick()
         time.sleep(1)
+        print(score)
+
 
 hookPrompt = cv2.imread(
-    'Resources\\HookScreenshot_Stonetalon.png', cv2.IMREAD_COLOR)
+    'Resources\\HookScreenshot_Feralas.png', cv2.IMREAD_COLOR)
 hookPromptThreshold = 0.08
 hookAlpha = 4
 
 
-frameMin = x3/4, 0
-frameMax = 3 * x3 / 4, y3/2
+calibrationMin = x3/4, 15
+calibrationMax = 3 * x3 / 4, y3/2 - 25
 
 
-def GetHookFrameData():
-    frame = GetScreenshotColor((frameMin[0], frameMin[1], frameMax[0], frameMax[1]))
+def GetHookFrameData(Min, Max):
+    frame = GetScreenshotColor((Min[0], Min[1], Max[0], Max[1]))
     score, minLoc, maxLoc = GetMatchScore(frame, hookPrompt)
     return frame, score, maxLoc
 
-
+hookAreaSize = 100
 def TryHook(data):
     if (data.fishingState == fishingstateWaitingForBite):
-        frame, score, maxLoc = GetHookFrameData()
+        hookMin = data.averageLocation[0] - hookAreaSize, data.averageLocation[1] - hookAreaSize
+        hookMax = data.averageLocation[0] + hookAreaSize, data.averageLocation[1] + hookAreaSize
+        frame, score, maxLoc = GetHookFrameData(hookMin, hookMax)
+        DisplayDebugOutput('TryHook', frame, hookPrompt, maxLoc, False)
+
         scoreDelta = abs(score - data.scoreAverage)
-        if (scoreDelta > hookAlpha * data.scoreStdDev):
-            print(scoreDelta, data.scoreAverage, data.scoreStdDev)
+        if (scoreDelta > 0 and scoreDelta > hookAlpha * data.scoreStdDev):
+            print(scoreDelta/data.scoreStdDev, score, data.scoreAverage, abs(scoreDelta), data.scoreStdDev, data.averageLocation)
             print('Hooking!')
             h, w, d = hookPrompt.shape
-            matchLocMin = (frameMin[0] + maxLoc[0], frameMin[1] + maxLoc[1])
+            matchLocMin = data.averageLocation
             matchLocMax = (matchLocMin[0] + w, matchLocMin[1] + h)
             moveToX = 0.5 * (matchLocMin[0] + matchLocMax[0])
             moveToY = 0.5 * (matchLocMin[1] + matchLocMax[1])
             pyautogui.moveTo(moveToX, moveToY, 0.15)
-            time.sleep(0.4)
+            time.sleep(0.2)
 
             PressKeysAfterRandomTime('shift')
             pyautogui.rightClick()
@@ -420,18 +453,29 @@ def TickFishing(data):
 
     data.timeSinceLastCast = time.time() - data.timeOfLastCast
     if (ShouldCalibrate(data)):
+        frame, score, maxLoc = GetHookFrameData(calibrationMin, calibrationMax)
         if (data.timeSinceLastCast < CalibrationTime):
-            frame, score, maxLoc = GetHookFrameData()
             data.calibrationScores.append(score)
+            data.calibrationLocations.append([maxLoc[0], maxLoc[1]])
+
+            DisplayDebugOutput('Calibration', frame, hookPrompt, maxLoc, False)
         else:
             data.scoreAverage = np.mean(data.calibrationScores)
             data.scoreStdDev = np.std(data.calibrationScores)
+            rawMean = np.median(data.calibrationLocations, axis=0)
+            data.averageLocation = rawMean + calibrationMin
             data.fishingState = fishingstateWaitingForBite
+
+            DisplayDebugOutput('CalibrationResult', frame, hookPrompt, rawMean, True)
 
     if (TryHook(data)):
         data.calibrationScores = []
+        data.calibrationLocations = []
         data.fishingState = fishingStateIdle
         data.timeOfLastHookAction = time.time()
+
+        global catchDebugCounts
+        catchDebugCounts = {}
 
     if (data.timeSinceLastCast > MaxFishingTime):
         print('Fish missed')
