@@ -344,6 +344,8 @@ class DynamicFishingData:
     calibrationLocations = []
     scoreAverage = 0
     scoreStdDev = 0
+    highestDelta = 0.0
+    holdFrames = 0
     averageLocation = None
 
 
@@ -392,12 +394,13 @@ def TryLootBoP():
 
 
 hookPrompt = cv2.imread(
-    'Resources\\HookScreenshot_Feralas.png', cv2.IMREAD_COLOR)
+    'Resources\\HookScreenshot_Zangramarsh.png', cv2.IMREAD_COLOR)
 hookPromptThreshold = 0.08
-hookAlpha = 4
+hookAlpha = 2.5
+hookHoldFrames = 1
 
 
-calibrationMin = x3/4, 15
+calibrationMin = x3/4, 100
 calibrationMax = 3 * x3 / 4, y3/2 - 25
 
 
@@ -406,41 +409,52 @@ def GetHookFrameData(Min, Max):
     score, minLoc, maxLoc = GetMatchScore(frame, hookPrompt)
     return frame, score, maxLoc
 
-hookAreaSize = 100
+hookAreaSize = 50
 def TryHook(data):
     if (data.fishingState == fishingstateWaitingForBite):
         hookMin = data.averageLocation[0] - hookAreaSize, data.averageLocation[1] - hookAreaSize
         hookMax = data.averageLocation[0] + hookAreaSize, data.averageLocation[1] + hookAreaSize
         frame, score, maxLoc = GetHookFrameData(hookMin, hookMax)
-        DisplayDebugOutput('TryHook', frame, hookPrompt, maxLoc, False)
+        #DisplayDebugOutput('TryHook', frame, hookPrompt, maxLoc, False)
 
         scoreDelta = abs(score - data.scoreAverage)
+        if (scoreDelta > data.highestDelta):
+            print('Highest score ratio: ', scoreDelta/data.scoreStdDev)
+            data.highestDelta = scoreDelta
+
         if (scoreDelta > 0 and scoreDelta > hookAlpha * data.scoreStdDev):
-            print(scoreDelta/data.scoreStdDev, score, data.scoreAverage, abs(scoreDelta), data.scoreStdDev, data.averageLocation)
-            print('Hooking!')
-            h, w, d = hookPrompt.shape
-            matchLocMin = data.averageLocation
-            matchLocMax = (matchLocMin[0] + w, matchLocMin[1] + h)
-            moveToX = 0.5 * (matchLocMin[0] + matchLocMax[0])
-            moveToY = 0.5 * (matchLocMin[1] + matchLocMax[1])
-            pyautogui.moveTo(moveToX, moveToY, 0.15)
-            time.sleep(0.2)
+            if (data.holdFrames >= hookHoldFrames):
+                print(scoreDelta/data.scoreStdDev, score, data.scoreAverage, abs(scoreDelta), data.scoreStdDev, data.averageLocation)
+                print('Hooking!')
+                h, w, d = hookPrompt.shape
+                matchLocMin = data.averageLocation
+                matchLocMax = (matchLocMin[0] + w, matchLocMin[1] + h)
+                moveToX = 0.5 * (matchLocMin[0] + matchLocMax[0])
+                moveToY = 0.5 * (matchLocMin[1] + matchLocMax[1])
+                pyautogui.moveTo(moveToX, moveToY, 0.15)
+                time.sleep(0.2)
 
-            PressKeysAfterRandomTime('shift')
-            pyautogui.rightClick()
-            ReleaseKeysAfterRandomTime('shift')
-            time.sleep(2)
+                PressKeysAfterRandomTime('shift')
+                pyautogui.rightClick()
+                ReleaseKeysAfterRandomTime('shift')
+                time.sleep(2)
 
-            TryLootBoP()
+                TryLootBoP()
 
-            pyautogui.moveTo(moveToX + 2.0 * frame.shape[0], moveToY, 0.3)
-            return True
+                pyautogui.moveTo(moveToX + 2.0 * frame.shape[0], moveToY, 0.3)
+                return True
+            else:
+                data.holdFrames += 1
+        else:
+            if (data.holdFrames > 0):
+                print('False positive')
+            data.holdFrames = 0
     return False
 
 
-MaxFishingTime = 25
+MaxFishingTime = 21
 TimeoutLogout = 360
-CalibrationTime = 2
+CalibrationTime = 4
 
 
 def TickFishing(data):
@@ -458,7 +472,7 @@ def TickFishing(data):
             data.calibrationScores.append(score)
             data.calibrationLocations.append([maxLoc[0], maxLoc[1]])
 
-            DisplayDebugOutput('Calibration', frame, hookPrompt, maxLoc, False)
+            #DisplayDebugOutput('Calibration', frame, hookPrompt, maxLoc, False)
         else:
             data.scoreAverage = np.mean(data.calibrationScores)
             data.scoreStdDev = np.std(data.calibrationScores)
@@ -473,6 +487,8 @@ def TickFishing(data):
         data.calibrationLocations = []
         data.fishingState = fishingStateIdle
         data.timeOfLastHookAction = time.time()
+        data.highestDelta = 0.0
+        data.holdFrames = 0
 
         global catchDebugCounts
         catchDebugCounts = {}
