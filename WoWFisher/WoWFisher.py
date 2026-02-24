@@ -394,8 +394,7 @@ def TryLootBoP():
         print(score)
 
 
-hookPrompt = cv2.imread(
-    'Resources\\HookScreenshot_Terokkar.png', cv2.IMREAD_COLOR)
+hookPrompt = cv2.imread('Resources\\HookScreenshot_' + sys.argv[1] + '.png', cv2.IMREAD_COLOR)
 hookPromptThreshold = 0.08
 hookAlpha = 2.5
 hookHoldFrames = 1
