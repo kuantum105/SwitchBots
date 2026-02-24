@@ -340,6 +340,7 @@ class DynamicFishingData:
     fishingState = fishingStateIdle
     timeOfLastCast = time.time()
     timeOfLastHookAction = time.time()
+    timeOfLastLure = 0.0
     calibrationScores = []
     calibrationLocations = []
     scoreAverage = 0
@@ -394,7 +395,7 @@ def TryLootBoP():
 
 
 hookPrompt = cv2.imread(
-    'Resources\\HookScreenshot_Zangramarsh.png', cv2.IMREAD_COLOR)
+    'Resources\\HookScreenshot_Terokkar.png', cv2.IMREAD_COLOR)
 hookPromptThreshold = 0.08
 hookAlpha = 2.5
 hookHoldFrames = 1
@@ -451,6 +452,17 @@ def TryHook(data):
             data.holdFrames = 0
     return False
 
+ReapplyLureTime = 570
+def TryApplyLure(data):
+    if (data.fishingState == fishingStateIdle):
+        if (time.time() - data.timeOfLastLure > ReapplyLureTime):
+            PressKeysForRandomTime('F2')
+            time.sleep(6)
+            data.timeOfLastLure = time.time()
+            return True
+
+    return False
+
 
 MaxFishingTime = 21
 TimeoutLogout = 360
@@ -458,6 +470,8 @@ CalibrationTime = 4
 
 
 def TickFishing(data):
+    TryApplyLure(data)
+
     if (ShouldCastReel(data)):
         print('Casting reel')
         PressKeysForRandomTime('F1')
