@@ -451,12 +451,13 @@ def TryHook(data):
             data.holdFrames = 0
     return False
 
-ReapplyLureTime = 570
+ReapplyLureTime = 610
 def TryApplyLure(data):
     if (data.fishingState == fishingStateIdle):
-        if (time.time() - data.timeOfLastLure > ReapplyLureTime):
+        timeSinceLastLure = time.time() - data.timeOfLastLure
+        if (timeSinceLastLure > ReapplyLureTime):
             PressKeysForRandomTime('F2')
-            time.sleep(6)
+            time.sleep(7)
             data.timeOfLastLure = time.time()
             return True
 
