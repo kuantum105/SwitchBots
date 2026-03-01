@@ -361,7 +361,7 @@ def TransitionToFishingState():
 
 
 def ShouldCalibrate(data):
-    if (data.fishingState == fishingStateCalibrating):
+    if (data.fishingState == fishingStateCalibrating or data.fishingState == fishingstateWaitingForBite):
         return True
     else:
         return False
@@ -396,8 +396,8 @@ def TryLootBoP():
 
 hookPrompt = cv2.imread('Resources\\HookScreenshot_' + sys.argv[1] + '.png', cv2.IMREAD_COLOR)
 hookPromptThreshold = 0.08
-hookAlpha = 2.5
-hookHoldFrames = 1
+hookAlpha = 4
+hookHoldFrames = 0
 
 
 calibrationMin = x3/4, 100
@@ -466,7 +466,7 @@ def TryApplyLure(data):
 
 MaxFishingTime = 21
 TimeoutLogout = 360
-CalibrationTime = 4
+CalibrationTime = 3
 
 
 def TickFishing(data):
@@ -482,19 +482,21 @@ def TickFishing(data):
     data.timeSinceLastCast = time.time() - data.timeOfLastCast
     if (ShouldCalibrate(data)):
         frame, score, maxLoc = GetHookFrameData(calibrationMin, calibrationMax)
-        if (data.timeSinceLastCast < CalibrationTime):
-            data.calibrationScores.append(score)
-            data.calibrationLocations.append([maxLoc[0], maxLoc[1]])
+        data.calibrationScores.append(score)
+        data.calibrationLocations.append([maxLoc[0], maxLoc[1]])
+        #DisplayDebugOutput('Calibration', frame, hookPrompt, maxLoc, False)
 
-            #DisplayDebugOutput('Calibration', frame, hookPrompt, maxLoc, False)
-        else:
+        if (data.timeSinceLastCast > CalibrationTime):
+            data.calibrationScores.pop(0)
+            data.calibrationLocations.pop(0)
+
             data.scoreAverage = np.mean(data.calibrationScores)
             data.scoreStdDev = np.std(data.calibrationScores)
             rawMean = np.median(data.calibrationLocations, axis=0)
             data.averageLocation = rawMean + calibrationMin
             data.fishingState = fishingstateWaitingForBite
 
-            DisplayDebugOutput('CalibrationResult', frame, hookPrompt, rawMean, True)
+            #DisplayDebugOutput('CalibrationResult', frame, hookPrompt, rawMean, False)
 
     if (TryHook(data)):
         data.calibrationScores = []
