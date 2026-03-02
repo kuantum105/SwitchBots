@@ -143,9 +143,7 @@ def check_and_purchase(index):
 
     if buyout < purchase_limit and quantity > 1:
         pyautogui.click((listings[index]["x"], listings[index]["y"]))
-        time.sleep(0.05)
         keyboard.press("end")
-        time.sleep(0.05)
         keyboard.release("end")
         print("Attempted to Purchase " + str(quantity) + " @ " + str(buyout))
 
@@ -171,6 +169,7 @@ welcome()
 while get_gold() > 1:
     while is_search_red():
         auction_click_search()
+        time.sleep(0.1)
         print("------------")
         print("     Index 0: ", check_and_purchase(0))
         print("     Index 1: ", check_and_purchase(1))
