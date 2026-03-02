@@ -1,20 +1,40 @@
 import cv2
+from datetime import datetime
 import keyboard
 import numpy as np
 import pyautogui
 import pygetwindow
-import pytesseract
+import easyocr
 import re
 import time
 
+
 # ---------- CONSTANTS & VARS---------- #
 listings = [
-    {"x": 1125, "y": 363, "coord": (1125, 363, 1335, 409)},
-    {"x": 1125, "y": 427, "coord": (1125, 427, 1335, 472)},
-    {"x": 1125, "y": 490, "coord": (1125, 490, 1335, 532)},
+    {
+        "x": 1125,
+        "y": 363,
+        "coord": (1125, 363, 1335, 409),
+        "buyout": (1220, 389, 1333, 408),
+        "quantity": (1171, 364, 1334, 382),
+    },
+    {
+        "x": 1125,
+        "y": 427,
+        "coord": (1125, 427, 1335, 472),
+        "buyout": (1220, 450, 1333, 474),
+        "quantity": (1171, 430, 1223, 450),
+    },
+    {
+        "x": 1125,
+        "y": 490,
+        "coord": (1125, 490, 1335, 532),
+        "buyout": (1220, 513, 1333, 534),
+        "quantity": (1171, 490, 1223, 510),
+    },
 ]
 
-my_gold = {"coord": (98, 876, 150, 898)}
+my_gold = {"coord": (98, 876, 170, 898)}
 
 search_button = {"coord": (1199, 252, 1219, 267), "x": 1199, "y": 252}
 
@@ -25,8 +45,7 @@ red_mask2 = {"lower_bound": (175, 50, 20), "upper_bound": (180, 255, 255)}
 
 purchase_limit = 12.85
 min_quantity = 2
-
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+reader = easyocr.Reader(["en"])
 
 window_default = {"x": 2560, "y": 1440}
 
@@ -56,22 +75,13 @@ def get_screenshot_colour(coords):
 def get_screenshot_grey(coords):
     screenshot = pyautogui.screenshot()
     screenshot = screenshot.crop(coords)
-    return cv2.cvtColor(np.array(screenshot), cv2.COLOR_BGR2GRAY)
-
-
-def get_screenshot_grey_thresholded(coords):
-    ret, thresh = cv2.threshold(
-        get_screenshot_grey(coords),
-        binarization_thresholds["threshold"],
-        binarization_thresholds["max"],
-        cv2.THRESH_BINARY,
-    )
-
-    return thresh
+    screenshot = cv2.cvtColor(np.array(screenshot), cv2.COLOR_BGR2GRAY)
+    resized = cv2.resize(screenshot, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+    return resized
 
 
 def get_text(screenshot):
-    return pytesseract.image_to_string(screenshot, config="--psm 11 -l eng")
+    return reader.readtext(screenshot, detail=0, paragraph=True)
 
 
 def auction_click_search():
@@ -79,30 +89,39 @@ def auction_click_search():
     return
 
 
-def get_currency_from_screenshot(coords):
-    screenshot = get_screenshot_grey(coords)
+def get_gold():
+    screenshot = get_screenshot_grey(my_gold["coord"])
     text = get_text(screenshot)
-    all_currency = re.findall(r"\d+", text)
-    # cv2.imwrite("saved_image.jpg", screenshot)  # debugging
-
-    if len(all_currency) == 5:
-        return {
-            "quantity": int(all_currency[0]),
-            "currency": float(all_currency[3]) + float(all_currency[4]) / 100,
-        }
-    else:
-        return {
-            "quantity": 0,
-            "currency": 999,
-        }
+    try:
+        return int(text[0])
+    except:
+        return 0
 
 
-def get_my_gold():
-    screenshot = get_screenshot_grey_thresholded(my_gold["coord"])
+def get_quantity(index):
+    screenshot = get_screenshot_grey(listings[index].get("quantity"))
+    try:
+        text = get_text(screenshot)[0]
+
+        if "x" in text.lower():
+            return int(text.split("x")[0])
+        else:
+            return 0
+    except:
+        return 0
+
+
+def get_buyout(index):
+    screenshot = get_screenshot_grey(listings[index].get("buyout"))
     text = get_text(screenshot)
-    cv2.imwrite("saved_image.jpg", screenshot)  # debugging
-
-    return re.findall(r"\d+", text)
+    buyout = 0
+    try:
+        for index, value in enumerate(text):
+            value = re.sub(r"[^\d ]", "", value)
+            buyout += float(value) / (100**index)
+        return buyout
+    except:
+        return 999
 
 
 def is_search_red():
@@ -118,42 +137,44 @@ def is_search_red():
         return False
 
 
-def check_and_purchase(position):
-    stack = get_currency_from_screenshot(listings[position].get("coord"))
+def check_and_purchase(index):
+    buyout = get_buyout(index)
+    quantity = get_quantity(index)
 
-    if stack["currency"] < purchase_limit and stack["quantity"] >= 2:
-        pyautogui.click((listings[position]["x"], listings[position]["y"]))
+    if buyout < purchase_limit and quantity > 1:
+        pyautogui.click((listings[index]["x"], listings[index]["y"]))
+        time.sleep(0.05)
         keyboard.press("end")
+        time.sleep(0.05)
         keyboard.release("end")
-        print(
-            "Attempted to Purchase "
-            + str(stack["quantity"])
-            + " @ "
-            + str(stack["currency"])
-        )
+        print("Attempted to Purchase " + str(quantity) + " @ " + str(buyout))
 
-    return stack["currency"]
+    return buyout, quantity
 
 
 def welcome():
     print("############## INITIALIZED ##############")
     print("############## ARE YOU READY ##############")
     print("############## TO MAKE MONEY ##############")
+    print("Starting Time: " + str(datetime.now()))
 
 
 # ---------- HELPERS END ---------- #
 
 # ---------- MAIN START ---------- #
 
+# TO STOP, CLOSE AUCTION HOUSE #
 wow_client = window_get("World of Warcraft")
 window_standardize(wow_client)
 welcome()
 
-while len(get_my_gold()) == 1:
+while get_gold() > 1:
     while is_search_red():
-        time.sleep(0.85)
         auction_click_search()
+        print("------------")
+        print("     Index 0: ", check_and_purchase(0))
+        print("     Index 1: ", check_and_purchase(1))
+        print("     Index 2: ", check_and_purchase(2))
+        print("------------")
 
-        check_and_purchase(0)
-        check_and_purchase(1)
-        check_and_purchase(2)
+print("Ending Time: " + str(datetime.now()))
