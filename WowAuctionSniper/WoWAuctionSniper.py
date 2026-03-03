@@ -67,14 +67,12 @@ def window_standardize(window):
 
 
 def get_screenshot_colour(coords):
-    screenshot = pyautogui.screenshot()
-    screenshot = screenshot.crop(coords)
+    screenshot = pyautogui.screenshot(region=coords)
     return cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
 
 
 def get_screenshot_grey(coords):
-    screenshot = pyautogui.screenshot()
-    screenshot = screenshot.crop(coords)
+    screenshot = pyautogui.screenshot(region=coords)
     screenshot = cv2.cvtColor(np.array(screenshot), cv2.COLOR_BGR2GRAY)
     resized = cv2.resize(screenshot, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
     return resized
@@ -106,9 +104,9 @@ def get_quantity(index):
         if "x" in text.lower():
             return int(text.split("x")[0])
         else:
-            return 0
+            return 1
     except:
-        return 0
+        return 1
 
 
 def get_buyout(index):
@@ -169,7 +167,7 @@ welcome()
 while get_gold() > 1:
     while is_search_red():
         auction_click_search()
-        time.sleep(0.1)
+        time.sleep(0.125)
         print("------------")
         print("     Index 0: ", check_and_purchase(0))
         print("     Index 1: ", check_and_purchase(1))
