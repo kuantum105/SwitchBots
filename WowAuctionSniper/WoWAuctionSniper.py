@@ -1,5 +1,5 @@
 import cv2
-from datetime import datetime
+from datetime import datetime, timedelta
 import keyboard
 import numpy as np
 import pyautogui
@@ -153,6 +153,17 @@ def check_and_purchase(index):
     return buyout, quantity
 
 
+def anti_afk():
+    keyboard.press("a")
+    time.sleep(0.0625)
+    keyboard.release("a")
+    keyboard.press("d")
+    time.sleep(0.0625)
+    keyboard.release("d")
+
+    return datetime.now()
+
+
 def welcome():
     print("############## INITIALIZED ##############")
     print("############## ARE YOU READY ##############")
@@ -167,12 +178,15 @@ def welcome():
 # TO STOP, CLOSE AUCTION HOUSE #
 wow_client = window_get("World of Warcraft")
 window_standardize(wow_client)
+afk_timer = datetime.now()
 welcome()
 
 while get_gold() > 1:
     while is_search_red():
         auction_click_search()
-        time.sleep(0.125)
+        if afk_timer <= (datetime.now() - timedelta(minutes=25)):
+            print("Activating Anti AFK")
+            afk_timer = anti_afk()
         print("------------")
         print("     Index 0: ", check_and_purchase(0))
         print("     Index 1: ", check_and_purchase(1))
