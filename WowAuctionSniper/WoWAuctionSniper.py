@@ -67,12 +67,14 @@ def window_standardize(window):
 
 
 def get_screenshot_colour(coords):
-    screenshot = pyautogui.screenshot(region=coords)
+    screenshot = pyautogui.screenshot()
+    screenshot = screenshot.crop(coords)
     return cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
 
 
 def get_screenshot_grey(coords):
-    screenshot = pyautogui.screenshot(region=coords)
+    screenshot = pyautogui.screenshot()
+    screenshot = screenshot.crop(coords)
     screenshot = cv2.cvtColor(np.array(screenshot), cv2.COLOR_BGR2GRAY)
     resized = cv2.resize(screenshot, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
     return resized
