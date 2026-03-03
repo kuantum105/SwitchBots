@@ -143,6 +143,7 @@ def check_and_purchase(index):
 
     if buyout < purchase_limit and quantity > 1:
         pyautogui.click((listings[index]["x"], listings[index]["y"]))
+        time.sleep(0.085)
         keyboard.press("end")
         keyboard.release("end")
         print("Attempted to Purchase " + str(quantity) + " @ " + str(buyout))
