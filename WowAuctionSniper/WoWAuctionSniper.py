@@ -10,6 +10,10 @@ import time
 
 
 # ---------- CONSTANTS & VARS---------- #
+
+purchase_limit = 12.85
+min_quantity = 2
+
 listings = [
     {
         "x": 1125,
@@ -43,8 +47,6 @@ binarization_thresholds = {"threshold": 127, "max": 255}
 red_mask = {"lower_bound": (0, 50, 20), "upper_bound": (5, 255, 255)}
 red_mask2 = {"lower_bound": (175, 50, 20), "upper_bound": (180, 255, 255)}
 
-purchase_limit = 12.85
-min_quantity = 2
 reader = easyocr.Reader(["en"])
 
 window_default = {"x": 2560, "y": 1440}
@@ -141,7 +143,7 @@ def check_and_purchase(index):
     buyout = get_buyout(index)
     quantity = get_quantity(index)
 
-    if buyout < purchase_limit and quantity > 1:
+    if buyout < purchase_limit and quantity >= min_quantity:
         pyautogui.click((listings[index]["x"], listings[index]["y"]))
         time.sleep(0.085)
         keyboard.press("end")
