@@ -38,9 +38,30 @@ listings = [
     },
 ]
 
+sell_button = {"x": 826, "y": 933}
+
+browse_button = {"x": 85, "y": 936}
+
+sell_silver = {"x": 640, "y": 310}
+
+sell_copper = {"x": 725, "y": 307}
+
+sell_quantity = {"x": 493, "y": 412}
+
+sell_stack = {"x": 743, "y": 414}
+
+post_btn_coord = (910, 405, 930, 418)
+
+buy_btn_coord = (1013, 879, 1049, 901)
+
+# sell_window_coord = (32, 476, 432, 866)
+
+img_netherweave_cloth = cv2.imread("reference_images/netherweave_cloth.jpg")
+
 my_gold = {"coord": (98, 876, 170, 898)}
 
 search_button = {"coord": (1199, 252, 1219, 267), "x": 1199, "y": 252}
+
 
 binarization_thresholds = {"threshold": 127, "max": 255}
 
@@ -54,7 +75,25 @@ window_default = {"x": 2560, "y": 1440}
 debugging_verbose = True
 # ---------- CONSTANTS & VARS END ---------- #
 
+
 # ---------- HELPERS ---------- #
+class EventTimeoutError(Exception):
+    def __init__(self, message="Event Timed Out"):
+        super().__init__(message)
+
+
+class ImageNotFound(Exception):
+    def __init__(self, message="Image Not Found"):
+        super().__init__(message)
+
+
+def wait_for_event(event_func, timeout=30, period=0.25):
+    end_time = time.time() + timeout
+    while time.time() < end_time:
+        if event_func():
+            return True
+        time.sleep(period)
+    raise EventTimeoutError()
 
 
 def window_get(window_title):
@@ -65,12 +104,13 @@ def window_standardize(window):
     window.resizeTo(window_default["x"], window_default["y"])
     window.moveTo(0, 0)
     window.activate()
-    time.sleep(3)
+    time.sleep(1.25)
 
 
-def get_screenshot_colour(coords):
+def get_screenshot_colour(coords, crop=True):
     screenshot = pyautogui.screenshot()
-    screenshot = screenshot.crop(coords)
+    if crop:
+        screenshot = screenshot.crop(coords)
     return cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
 
 
@@ -87,7 +127,7 @@ def get_text(screenshot):
 
 
 def auction_click_search():
-    pyautogui.click(search_button["x"], search_button["y"])
+    click_and_wait(search_button["x"], search_button["y"])
     return
 
 
@@ -126,8 +166,8 @@ def get_buyout(index):
         return 999
 
 
-def is_search_red():
-    screenshot = get_screenshot_colour(search_button["coord"])
+def is_red(coord):
+    screenshot = get_screenshot_colour(coord)
     screenshot = cv2.cvtColor(screenshot, cv2.COLOR_BGR2HSV)
     mask1 = cv2.inRange(screenshot, red_mask["lower_bound"], red_mask["upper_bound"])
     mask2 = cv2.inRange(screenshot, red_mask2["lower_bound"], red_mask2["upper_bound"])
@@ -144,7 +184,7 @@ def check_and_purchase(index):
     quantity = get_quantity(index)
 
     if buyout < purchase_limit and quantity >= min_quantity:
-        pyautogui.click((listings[index]["x"], listings[index]["y"]))
+        click_and_wait(listings[index]["x"], listings[index]["y"])
         time.sleep(0.085)
         keyboard.press("end")
         keyboard.release("end")
@@ -154,14 +194,92 @@ def check_and_purchase(index):
 
 
 def anti_afk():
-    keyboard.press("a")
-    time.sleep(0.0625)
-    keyboard.release("a")
-    keyboard.press("d")
-    time.sleep(0.0625)
-    keyboard.release("d")
+    key_press_release("a")
+    key_press_release("d")
 
     return datetime.now()
+
+
+def click_and_wait(x, y, wait=0.125, duration=0.01):
+    pyautogui.moveTo(x, y, duration)
+    pyautogui.click(x, y)
+    time.sleep(wait)
+    return
+
+
+def find_image_loc_in_image(target, image, threshold=0.95):
+    results = cv2.matchTemplate(np.array(image), target, cv2.TM_SQDIFF_NORMED)
+    min_confidence, _, minimum_location, _ = cv2.minMaxLoc(results)
+
+    confidence = 1 - min_confidence
+
+    if confidence >= threshold:
+        return minimum_location
+    else:
+        raise ImageNotFound()
+
+
+def click_netherweave():
+    x, y = find_image_loc_in_image(
+        img_netherweave_cloth, get_screenshot_colour(None, crop=False)
+    )
+    click_and_wait(x, y, wait=0.5)
+    return x, y
+
+
+def key_press_release(keys):
+    if isinstance(keys, str):
+        keys = [keys]
+
+    for key in keys:
+        keyboard.press(key)
+        time.sleep(0.0625)
+        keyboard.release(key)
+
+
+def list_item(click_item_func, min_price, quantity="1", stack="1"):
+    try:
+        click_item_func()
+        wait_for_event(lambda: is_red(buy_btn_coord))
+        click_and_wait(
+            sell_silver["x"],
+            sell_silver["y"],
+        )
+
+        for char in min_price["silver"]:
+            key_press_release(char)
+
+        click_and_wait(
+            sell_copper["x"],
+            sell_copper["y"],
+        )
+
+        for char in min_price["copper"]:
+            key_press_release(char)
+
+        click_and_wait(
+            sell_quantity["x"],
+            sell_quantity["y"],
+        )
+
+        for char in quantity:
+            key_press_release(char)
+
+        click_and_wait(
+            sell_stack["x"],
+            sell_stack["y"],
+        )
+
+        for char in stack:
+            key_press_release(char)
+
+        wait_for_event(lambda: is_red(post_btn_coord))
+
+        click_and_wait(post_btn_coord[0], post_btn_coord[1])
+    except EventTimeoutError:
+        print("Failed to List Item, Timeout Exceeded")
+
+    return
 
 
 def welcome():
@@ -179,18 +297,30 @@ def welcome():
 wow_client = window_get("World of Warcraft")
 window_standardize(wow_client)
 afk_timer = datetime.now()
+undercut_timer = datetime.now()
+gold_start = get_gold()
 welcome()
 
 while get_gold() > 1:
-    while is_search_red():
+    while is_red(search_button["coord"]):
         auction_click_search()
-        if afk_timer <= (datetime.now() - timedelta(minutes=25)):
+        time.sleep(0.125)
+
+        if afk_timer <= (datetime.now() - timedelta(minutes=4)):
             print("Activating Anti AFK")
             afk_timer = anti_afk()
+
         print("------------")
         print("     Index 0: ", check_and_purchase(0))
         print("     Index 1: ", check_and_purchase(1))
         print("     Index 2: ", check_and_purchase(2))
         print("------------")
 
+        if undercut_timer <= (datetime.now() - timedelta(minutes=3, seconds=0)):
+            click_and_wait(sell_button["x"], sell_button["y"])
+            list_item(click_netherweave, {"silver": "10", "copper": "38"})
+            click_and_wait(browse_button["x"], browse_button["y"])
+            undercut_timer = datetime.now()
+
 print("Ending Time: " + str(datetime.now()))
+print("Starting Gold: " + str(gold_start))
