@@ -38,7 +38,7 @@ listings = [
     },
 ]
 
-sell_button = {"x": 826, "y": 933}
+sell_button = {"x": 682, "y": 936}
 
 browse_button = {"x": 85, "y": 936}
 
@@ -135,7 +135,8 @@ def get_gold():
     screenshot = get_screenshot_grey(my_gold["coord"])
     text = get_text(screenshot)
     try:
-        return int(text[0])
+        text = re.sub(r'\D', '', text[0])
+        return int(text)
     except:
         return 0
 
@@ -226,7 +227,6 @@ def click_netherweave():
     click_and_wait(x, y, wait=0.5)
     return x, y
 
-
 def key_press_release(keys):
     if isinstance(keys, str):
         keys = [keys]
@@ -276,7 +276,7 @@ def list_item(click_item_func, min_price, quantity="1", stack="1"):
         wait_for_event(lambda: is_red(post_btn_coord))
 
         click_and_wait(post_btn_coord[0], post_btn_coord[1])
-    except EventTimeoutError:
+    except (EventTimeoutError, ImageNotFound) as exception:
         print("Failed to List Item, Timeout Exceeded")
 
     return
@@ -297,7 +297,7 @@ def welcome():
 wow_client = window_get("World of Warcraft")
 window_standardize(wow_client)
 afk_timer = datetime.now()
-undercut_timer = datetime.now()
+undercut_timer = datetime.now() - timedelta(minutes=3, seconds=0)
 gold_start = get_gold()
 welcome()
 
@@ -318,7 +318,7 @@ while get_gold() > 1:
 
         if undercut_timer <= (datetime.now() - timedelta(minutes=3, seconds=0)):
             click_and_wait(sell_button["x"], sell_button["y"])
-            list_item(click_netherweave, {"silver": "10", "copper": "38"})
+            list_item(click_netherweave, {"silver": "10", "copper": "36"})
             click_and_wait(browse_button["x"], browse_button["y"])
             undercut_timer = datetime.now()
 
